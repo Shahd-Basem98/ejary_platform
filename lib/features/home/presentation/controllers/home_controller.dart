@@ -5,30 +5,40 @@ import '../../domain/repositories/property_repository.dart';
 class HomeController extends GetxController with StateMixin<List<PropertyEntity>> {
   final PropertyRepository _repository = Get.find<PropertyRepository>();
 
-  List<PropertyEntity> _allProperties = [];
-  final selectedCategory = 'all'.obs;
+  List<PropertyEntity> allUnits = [];
+  final selectedFilter = 'all'.obs; // all, rented, vacant, overdue
   final searchQuery = ''.obs;
-  List<String> bookedIds = [];
 
   @override
   void onInit() {
     super.onInit();
-    bookedIds = _repository.getBookedPropertyIds();
-    fetchProperties();
+    fetchUnits();
   }
 
-  Future<void> fetchProperties() async {
+  Future<void> fetchUnits() async {
     change(null, status: RxStatus.loading());
     try {
-      _allProperties = await _repository.getProperties();
+      allUnits = await _repository.getUnitsAndContracts();
       _applyFilters();
+      update(['summary_cards', 'unit_details']);
     } catch (e) {
       change(null, status: RxStatus.error(e.toString()));
     }
   }
 
-  void selectCategory(String category) {
-    selectedCategory.value = category;
+  double get totalExpected =>
+      allUnits.where((u) => u.isRented).fold(0.0, (sum, u) => sum + u.monthlyRent);
+
+  double get totalCollected =>
+      allUnits.where((u) => u.isRented).fold(0.0, (sum, u) => sum + u.totalPaid);
+
+  double get totalRemaining {
+    final diff = totalExpected - totalCollected;
+    return diff > 0 ? diff : 0.0;
+  }
+
+  void selectFilter(String filter) {
+    selectedFilter.value = filter;
     _applyFilters();
   }
 
@@ -38,17 +48,25 @@ class HomeController extends GetxController with StateMixin<List<PropertyEntity>
   }
 
   void _applyFilters() {
-    final query = searchQuery.value.trim().toLowerCase();
-    final cat = selectedCategory.value;
+    final q = searchQuery.value.trim().toLowerCase();
+    final filter = selectedFilter.value;
 
-    final filtered = _allProperties.where((item) {
-      final matchesCategory = cat == 'all' || item.category == cat;
-      final matchesQuery = query.isEmpty ||
-          item.titleAr.toLowerCase().contains(query) ||
-          item.titleEn.toLowerCase().contains(query) ||
-          item.locationAr.toLowerCase().contains(query) ||
-          item.locationEn.toLowerCase().contains(query);
-      return matchesCategory && matchesQuery;
+    final filtered = allUnits.where((u) {
+      final matchesFilter = switch (filter) {
+        'rented' => u.isRented,
+        'vacant' => !u.isRented,
+        'overdue' => u.isRented && u.remainingBalance > 0,
+        _ => true,
+      };
+
+      final matchesSearch = q.isEmpty ||
+          u.tenantName.toLowerCase().contains(q) ||
+          u.propertyNameAr.toLowerCase().contains(q) ||
+          u.propertyNameEn.toLowerCase().contains(q) ||
+          u.unitTitleAr.toLowerCase().contains(q) ||
+          u.unitTitleEn.toLowerCase().contains(q);
+
+      return matchesFilter && matchesSearch;
     }).toList();
 
     if (filtered.isEmpty) {
@@ -58,12 +76,22 @@ class HomeController extends GetxController with StateMixin<List<PropertyEntity>
     }
   }
 
-  bool isBooked(String propertyId) => bookedIds.contains(propertyId);
+  PropertyEntity getUnitById(String id) {
+    return allUnits.firstWhere((element) => element.id == id);
+  }
 
-  // تحديث عبر GetBuilder عند تغيير حالة الحجز
-  Future<void> toggleBooking(String propertyId) async {
-    await _repository.togglePropertyBooking(propertyId);
-    bookedIds = _repository.getBookedPropertyIds();
-    update(['booking_section']);
+  Future<void> recordPayment({
+    required String unitId,
+    required double amount,
+    required String method,
+    required String referenceNumber,
+  }) async {
+    await _repository.addPaymentReceipt(
+      unitId: unitId,
+      amount: amount,
+      method: method,
+      referenceNumber: referenceNumber,
+    );
+    await fetchUnits();
   }
 }

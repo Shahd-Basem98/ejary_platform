@@ -1,82 +1,155 @@
-import 'package:get/get.dart';
-import '../../../../core/services/storage_service.dart';
+import 'package:get_storage/get_storage.dart';
 import '../../domain/entities/property_entity.dart';
 import '../../domain/repositories/property_repository.dart';
-import '../models/property_model.dart';
 
 class PropertyRepositoryImpl implements PropertyRepository {
-  final StorageService _storage = Get.find<StorageService>();
+  final GetStorage _box = GetStorage();
 
-  final List<PropertyModel> _mockData = const [
-    PropertyModel(
-      id: 'prop_1',
-      titleAr: 'شقة مودرن فاخرة بإطلالة بانورامية',
-      titleEn: 'Luxury Modern Panoramic Apartment',
-      locationAr: 'صنعاء - حي حدة',
-      locationEn: 'Sanaa - Hadda District',
-      category: 'apartments',
-      monthlyPrice: 350,
-      rooms: 3,
-      baths: 2,
-      area: 165,
-      descriptionAr: 'شقة حديثة التشطيب قريبة من كافة الخدمات، تضم صالة واسعة ومطبخ مجهز وموقف سيارات خاص.',
-      descriptionEn: 'Newly finished apartment close to all services, featuring a spacious living room, equipped kitchen, and private parking.',
+  final List<PropertyEntity> _baseUnits = const [
+    PropertyEntity(
+      id: 'unit_101',
+      propertyNameAr: 'عمارة النور السكنية',
+      propertyNameEn: 'Al-Noor Residential Building',
+      unitTitleAr: 'شقة 101 - الدور الأول',
+      unitTitleEn: 'Apt 101 - 1st Floor',
+      zoneAr: 'صنعاء - حي حدة',
+      zoneEn: 'Sanaa - Hadda Zone',
+      unitTier: 'VIP',
+      isRented: true,
+      monthlyRent: 350,
+      dueDay: 10,
+      hasInsurance: true,
+      servicesAr: 'ماء وحراسة مشمولة • كهرباء عداد مستقل',
+      servicesEn: 'Water & Security included • Separate Electricity meter',
+      tenantName: 'أحمد صالح المقطري',
+      tenantPhone: '777123456',
+      familyMembers: 5,
+      jobAndGuaranteeAr: 'مهندس اتصالات • ضمانة تجارية',
+      jobAndGuaranteeEn: 'Telecom Engineer • Commercial Guarantee',
     ),
-    PropertyModel(
-      id: 'prop_2',
-      titleAr: 'فيلا مستقلة مع حديقة خاصة',
-      titleEn: 'Detached Villa with Private Garden',
-      locationAr: 'صنعاء - فج عطان',
-      locationEn: 'Sanaa - Faj Attan',
-      category: 'villas',
-      monthlyPrice: 950,
-      rooms: 6,
-      baths: 4,
-      area: 420,
-      descriptionAr: 'فيلا راقية من طابقين مع حديقة أمامية، مجلس مستقل، ونظام طاقة شمسية متكامل.',
-      descriptionEn: 'Two-story upscale villa with front garden, separate reception hall, and full solar power system.',
+    PropertyEntity(
+      id: 'unit_102',
+      propertyNameAr: 'عمارة النور السكنية',
+      propertyNameEn: 'Al-Noor Residential Building',
+      unitTitleAr: 'شقة 102 - الدور الثاني',
+      unitTitleEn: 'Apt 102 - 2nd Floor',
+      zoneAr: 'صنعاء - حي حدة',
+      zoneEn: 'Sanaa - Hadda Zone',
+      unitTier: 'Standard',
+      isRented: true,
+      monthlyRent: 250,
+      dueDay: 15,
+      hasInsurance: true,
+      servicesAr: 'ماء ونظافة مشمولة ضمن الإيجار',
+      servicesEn: 'Water & Cleaning included in rent',
+      tenantName: 'خالد محمد الحميري',
+      tenantPhone: '771987654',
+      familyMembers: 4,
+      jobAndGuaranteeAr: 'محاسب قانوني • كفيل تجاري',
+      jobAndGuaranteeEn: 'Accountant • Commercial Sponsor',
     ),
-    PropertyModel(
-      id: 'prop_3',
-      titleAr: 'مكتب إداري جاهز للشركات الناشئة',
-      titleEn: 'Ready Executive Office for Startups',
-      locationAr: 'صنعاء - شارع الخمسين',
-      locationEn: 'Sanaa - Al-Khamseen Street',
-      category: 'offices',
-      monthlyPrice: 500,
-      rooms: 4,
-      baths: 2,
-      area: 210,
-      descriptionAr: 'مساحة مكتبية مكيفة ومقسمة باحترافية مع قاعة اجتماعات وإنترنت فائق السرعة.',
-      descriptionEn: 'Air-conditioned professionally partitioned office space with a meeting room and high-speed internet.',
+    PropertyEntity(
+      id: 'unit_201',
+      propertyNameAr: 'برج الأندلس التجاري',
+      propertyNameEn: 'Al-Andalus Commercial Tower',
+      unitTitleAr: 'معرض تجاري رقم 4',
+      unitTitleEn: 'Commercial Shop #4',
+      zoneAr: 'صنعاء - شارع الخمسين',
+      zoneEn: 'Sanaa - Al-Khamseen St.',
+      unitTier: 'VIP',
+      isRented: true,
+      monthlyRent: 600,
+      dueDay: 30,
+      hasInsurance: true,
+      servicesAr: 'حراسة 24 ساعة • طاقة شمسية مشتركة',
+      servicesEn: '24/7 Security • Shared Solar Power',
+      tenantName: 'مؤسسة الرواد للتجارة',
+      tenantPhone: '770555444',
+      familyMembers: 1,
+      jobAndGuaranteeAr: 'سجل تجاري ساري المفعول',
+      jobAndGuaranteeEn: 'Valid Commercial Registration',
     ),
-    PropertyModel(
-      id: 'prop_4',
-      titleAr: 'شقة عائلية هادئة قرب الجامعة',
-      titleEn: 'Quiet Family Apartment Near University',
-      locationAr: 'صنعاء - الدائري الغربي',
-      locationEn: 'Sanaa - Western Ring Road',
-      category: 'apartments',
-      monthlyPrice: 240,
-      rooms: 3,
-      baths: 2,
-      area: 140,
-      descriptionAr: 'شقة مشمسة في مبنى عائلي هادئ، مناسبة للعائلات والطلاب مع خزان مياه مستقل.',
-      descriptionEn: 'Sunny apartment in a quiet family building, suitable for families and students with an independent water tank.',
+    PropertyEntity(
+      id: 'unit_202',
+      propertyNameAr: 'برج الأندلس التجاري',
+      propertyNameEn: 'Al-Andalus Commercial Tower',
+      unitTitleAr: 'مكتب إداري 305',
+      unitTitleEn: 'Executive Office 305',
+      zoneAr: 'صنعاء - شارع الخمسين',
+      zoneEn: 'Sanaa - Al-Khamseen St.',
+      unitTier: 'Standard',
+      isRented: false,
+      monthlyRent: 300,
+      dueDay: 1,
+      hasInsurance: false,
+      servicesAr: 'ماء وكهرباء حسب العداد',
+      servicesEn: 'Water & Electricity per meter',
+      tenantName: '-',
+      tenantPhone: '-',
+      familyMembers: 0,
+      jobAndGuaranteeAr: '-',
+      jobAndGuaranteeEn: '-',
     ),
   ];
 
-  @override
-  Future<List<PropertyEntity>> getProperties() async {
-    await Future.delayed(const Duration(milliseconds: 700));
-    return _mockData;
+  List<PaymentRecord> _readPayments(String unitId) {
+    final raw = _box.read<List<dynamic>>('payments_$unitId');
+    if (raw == null) {
+      // دفعات ابتدائية افتراضية لتوضيح الدفع الكامل والجزئي
+      if (unitId == 'unit_101') {
+        return const [
+          PaymentRecord(
+            id: 'pay_1',
+            amount: 350,
+            method: 'wallet',
+            referenceNumber: 'JAW-984210',
+            date: '2026-11-10',
+          ),
+        ];
+      } else if (unitId == 'unit_102') {
+        return const [
+          PaymentRecord(
+            id: 'pay_2',
+            amount: 150,
+            method: 'cash',
+            referenceNumber: 'CASH-001',
+            date: '2026-11-14',
+          ),
+        ];
+      }
+      return [];
+    }
+    return raw.map((e) => PaymentRecord.fromMap(Map<String, dynamic>.from(e))).toList();
   }
 
   @override
-  List<String> getBookedPropertyIds() => _storage.bookedIds;
+  Future<List<PropertyEntity>> getUnitsAndContracts() async {
+    await Future.delayed(const Duration(milliseconds: 500));
+    return _baseUnits.map((unit) => unit.copyWith(payments: _readPayments(unit.id))).toList();
+  }
 
   @override
-  Future<void> togglePropertyBooking(String propertyId) async {
-    await _storage.toggleBooking(propertyId);
+  Future<void> addPaymentReceipt({
+    required String unitId,
+    required double amount,
+    required String method,
+    required String referenceNumber,
+  }) async {
+    final current = _readPayments(unitId);
+    final now = DateTime.now();
+    final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    current.insert(
+      0,
+      PaymentRecord(
+        id: 'pay_${now.millisecondsSinceEpoch}',
+        amount: amount,
+        method: method,
+        referenceNumber: referenceNumber.trim().isEmpty ? 'CASH-${current.length + 1}' : referenceNumber.trim(),
+        date: dateStr,
+      ),
+    );
+
+    await _box.write('payments_$unitId', current.map((e) => e.toMap()).toList());
   }
 }
