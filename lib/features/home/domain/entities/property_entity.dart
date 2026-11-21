@@ -30,6 +30,46 @@ class PaymentRecord {
   );
 }
 
+class MovementRecord {
+  final String id;
+  final String titleAr;
+  final String titleEn;
+  final String subtitleAr;
+  final String subtitleEn;
+  final String date;
+  final String type; // contract | payment | vacate
+
+  const MovementRecord({
+    required this.id,
+    required this.titleAr,
+    required this.titleEn,
+    required this.subtitleAr,
+    required this.subtitleEn,
+    required this.date,
+    required this.type,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'titleAr': titleAr,
+    'titleEn': titleEn,
+    'subtitleAr': subtitleAr,
+    'subtitleEn': subtitleEn,
+    'date': date,
+    'type': type,
+  };
+
+  factory MovementRecord.fromMap(Map<String, dynamic> map) => MovementRecord(
+    id: map['id'] ?? '',
+    titleAr: map['titleAr'] ?? '',
+    titleEn: map['titleEn'] ?? '',
+    subtitleAr: map['subtitleAr'] ?? '',
+    subtitleEn: map['subtitleEn'] ?? '',
+    date: map['date'] ?? '',
+    type: map['type'] ?? 'payment',
+  );
+}
+
 class PropertyEntity {
   final String id;
   final String propertyNameAr;
@@ -46,14 +86,12 @@ class PropertyEntity {
   final String servicesAr;
   final String servicesEn;
 
-  // بيانات المستأجر (Tenant)
   final String tenantName;
   final String tenantPhone;
   final int familyMembers;
   final String jobAndGuaranteeAr;
   final String jobAndGuaranteeEn;
 
-  // سجل المدفوعات (Payments)
   final List<PaymentRecord> payments;
 
   const PropertyEntity({
@@ -82,7 +120,17 @@ class PropertyEntity {
   double get totalPaid => payments.fold(0.0, (sum, p) => sum + p.amount);
   double get remainingBalance => isRented ? (monthlyRent - totalPaid) : 0.0;
 
-  PropertyEntity copyWith({List<PaymentRecord>? payments}) {
+  PropertyEntity copyWith({
+    bool? isRented,
+    int? dueDay,
+    bool? hasInsurance,
+    String? tenantName,
+    String? tenantPhone,
+    int? familyMembers,
+    String? jobAndGuaranteeAr,
+    String? jobAndGuaranteeEn,
+    List<PaymentRecord>? payments,
+  }) {
     return PropertyEntity(
       id: id,
       propertyNameAr: propertyNameAr,
@@ -92,17 +140,17 @@ class PropertyEntity {
       zoneAr: zoneAr,
       zoneEn: zoneEn,
       unitTier: unitTier,
-      isRented: isRented,
+      isRented: isRented ?? this.isRented,
       monthlyRent: monthlyRent,
-      dueDay: dueDay,
-      hasInsurance: hasInsurance,
+      dueDay: dueDay ?? this.dueDay,
+      hasInsurance: hasInsurance ?? this.hasInsurance,
       servicesAr: servicesAr,
       servicesEn: servicesEn,
-      tenantName: tenantName,
-      tenantPhone: tenantPhone,
-      familyMembers: familyMembers,
-      jobAndGuaranteeAr: jobAndGuaranteeAr,
-      jobAndGuaranteeEn: jobAndGuaranteeEn,
+      tenantName: tenantName ?? this.tenantName,
+      tenantPhone: tenantPhone ?? this.tenantPhone,
+      familyMembers: familyMembers ?? this.familyMembers,
+      jobAndGuaranteeAr: jobAndGuaranteeAr ?? this.jobAndGuaranteeAr,
+      jobAndGuaranteeEn: jobAndGuaranteeEn ?? this.jobAndGuaranteeEn,
       payments: payments ?? this.payments,
     );
   }

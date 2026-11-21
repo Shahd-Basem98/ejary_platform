@@ -17,6 +17,11 @@ class HomeScreen extends GetView<HomeController> {
         title: Text('home_title'.tr),
         actions: [
           IconButton(
+            tooltip: 'movements_log'.tr,
+            icon: const Icon(Icons.history_rounded),
+            onPressed: () => _showMovementsSheet(context, isAr),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings_rounded),
             onPressed: () => Get.toNamed(AppRoutes.settings),
           ),
@@ -102,6 +107,62 @@ class HomeScreen extends GetView<HomeController> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showMovementsSheet(BuildContext context, bool isAr) {
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('movements_log'.tr, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Divider(height: 24),
+            if (controller.movements.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Center(child: Text('no_movements'.tr)),
+              )
+            else
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: controller.movements.length,
+                  separatorBuilder: (_, __) => const Divider(),
+                  itemBuilder: (_, index) {
+                    final m = controller.movements[index];
+                    final icon = switch (m.type) {
+                      'contract' => Icons.person_add_alt_1_rounded,
+                      'vacate' => Icons.door_front_door_outlined,
+                      _ => Icons.payments_rounded,
+                    };
+                    final color = switch (m.type) {
+                      'contract' => const Color(0xFF5E35B1),
+                      'vacate' => Colors.red.shade700,
+                      _ => Colors.green.shade700,
+                    };
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: CircleAvatar(
+                        backgroundColor: color.withValues(alpha: 0.14),
+                        child: Icon(icon, color: color, size: 20),
+                      ),
+                      title: Text(isAr ? m.titleAr : m.titleEn, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text('${isAr ? m.subtitleAr : m.subtitleEn}\n${m.date}'),
+                      isThreeLine: true,
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

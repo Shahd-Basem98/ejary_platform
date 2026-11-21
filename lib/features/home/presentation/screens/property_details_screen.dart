@@ -20,7 +20,6 @@ class PropertyDetailsScreen extends GetView<HomeController> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // بطاقة الوحدة والخدمات
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -55,11 +54,31 @@ class PropertyDetailsScreen extends GetView<HomeController> {
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Center(child: Text('vacant_unit_msg'.tr, style: const TextStyle(fontWeight: FontWeight.bold))),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.meeting_room_outlined, size: 48, color: Color(0xFF5E35B1)),
+                        const SizedBox(height: 12),
+                        Text('vacant_unit_msg'.tr, style: const TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 16),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _showAddTenantDialog(unit.id),
+                            icon: const Icon(Icons.person_add_alt_1_rounded),
+                            label: Text('add_tenant'.tr, style: const TextStyle(fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              backgroundColor: const Color(0xFF5E35B1),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               else ...[
-                // بطاقة المستأجر والرصيد
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -92,9 +111,8 @@ class PropertyDetailsScreen extends GetView<HomeController> {
                 ),
                 const SizedBox(height: 16),
 
-                // زر استلام دفعة إيجار (يدعم الدفع الجزئي والمقدم والنقدي والمحفظة)
                 ElevatedButton.icon(
-                  onPressed: () => _showReceivePaymentDialog(context, unit.id, unit.remainingBalance),
+                  onPressed: () => _showReceivePaymentDialog(unit.id, unit.remainingBalance),
                   icon: const Icon(Icons.payments_rounded),
                   label: Text('receive_payment'.tr, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
@@ -104,9 +122,20 @@ class PropertyDetailsScreen extends GetView<HomeController> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
+                const SizedBox(height: 10),
+
+                OutlinedButton.icon(
+                  onPressed: () => _confirmVacateUnit(unit.id),
+                  icon: const Icon(Icons.logout_rounded, color: Colors.red),
+                  label: Text('vacate_unit'.tr, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: const BorderSide(color: Colors.red),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
                 const SizedBox(height: 20),
 
-                // سجل الدفعات المستلمة
                 Text('payments_history'.tr, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 ...unit.payments.map(
@@ -129,7 +158,95 @@ class PropertyDetailsScreen extends GetView<HomeController> {
     );
   }
 
-  void _showReceivePaymentDialog(BuildContext context, String unitId, double suggestedAmount) {
+  void _showAddTenantDialog(String unitId) {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final familyCtrl = TextEditingController(text: '3');
+    final jobCtrl = TextEditingController();
+    final dueDayCtrl = TextEditingController(text: '10');
+    final hasInsurance = true.obs;
+
+    Get.defaultDialog(
+      title: 'add_tenant'.tr,
+      content: SingleChildScrollView(
+        child: Column(
+          children: [
+            TextField(controller: nameCtrl, decoration: InputDecoration(labelText: 'tenant_name'.tr)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(labelText: 'phone'.tr),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: familyCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(labelText: 'family_count'.tr),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: dueDayCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(labelText: 'due_day'.tr),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(controller: jobCtrl, decoration: InputDecoration(labelText: 'job_guarantee'.tr)),
+            Obx(
+                  () => CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('insurance'.tr),
+                value: hasInsurance.value,
+                onChanged: (v) => hasInsurance.value = v ?? true,
+              ),
+            ),
+          ],
+        ),
+      ),
+      textConfirm: 'save_contract'.tr,
+      onConfirm: () {
+        if (nameCtrl.text.trim().isNotEmpty) {
+          controller.addNewTenant(
+            unitId: unitId,
+            tenantName: nameCtrl.text.trim(),
+            tenantPhone: phoneCtrl.text.trim().isEmpty ? '-' : phoneCtrl.text.trim(),
+            familyMembers: int.tryParse(familyCtrl.text.trim()) ?? 1,
+            jobAndGuarantee: jobCtrl.text.trim().isEmpty ? '-' : jobCtrl.text.trim(),
+            dueDay: int.tryParse(dueDayCtrl.text.trim()) ?? 10,
+            hasInsurance: hasInsurance.value,
+          );
+          Get.back();
+          Get.snackbar('app_name'.tr, 'tenant_added'.tr, snackPosition: SnackPosition.BOTTOM);
+        }
+      },
+    );
+  }
+
+  void _confirmVacateUnit(String unitId) {
+    Get.defaultDialog(
+      title: 'vacate_unit'.tr,
+      middleText: 'vacate_confirm'.tr,
+      textConfirm: 'yes'.tr,
+      textCancel: 'no'.tr,
+      confirmTextColor: Colors.white,
+      buttonColor: Colors.red,
+      onConfirm: () {
+        controller.endContractAndVacate(unitId);
+        Get.back();
+        Get.snackbar('app_name'.tr, 'unit_vacated'.tr, snackPosition: SnackPosition.BOTTOM);
+      },
+    );
+  }
+
+  void _showReceivePaymentDialog(String unitId, double suggestedAmount) {
     final amountCtrl = TextEditingController(text: suggestedAmount > 0 ? suggestedAmount.toInt().toString() : '');
     final refCtrl = TextEditingController();
     final method = 'cash'.obs;

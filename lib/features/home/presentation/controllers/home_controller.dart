@@ -6,7 +6,8 @@ class HomeController extends GetxController with StateMixin<List<PropertyEntity>
   final PropertyRepository _repository = Get.find<PropertyRepository>();
 
   List<PropertyEntity> allUnits = [];
-  final selectedFilter = 'all'.obs; // all, rented, vacant, overdue
+  List<MovementRecord> movements = [];
+  final selectedFilter = 'all'.obs;
   final searchQuery = ''.obs;
 
   @override
@@ -19,6 +20,7 @@ class HomeController extends GetxController with StateMixin<List<PropertyEntity>
     change(null, status: RxStatus.loading());
     try {
       allUnits = await _repository.getUnitsAndContracts();
+      movements = await _repository.getMovements();
       _applyFilters();
       update(['summary_cards', 'unit_details']);
     } catch (e) {
@@ -92,6 +94,32 @@ class HomeController extends GetxController with StateMixin<List<PropertyEntity>
       method: method,
       referenceNumber: referenceNumber,
     );
+    await fetchUnits();
+  }
+
+  Future<void> addNewTenant({
+    required String unitId,
+    required String tenantName,
+    required String tenantPhone,
+    required int familyMembers,
+    required String jobAndGuarantee,
+    required int dueDay,
+    required bool hasInsurance,
+  }) async {
+    await _repository.assignTenantToUnit(
+      unitId: unitId,
+      tenantName: tenantName,
+      tenantPhone: tenantPhone,
+      familyMembers: familyMembers,
+      jobAndGuarantee: jobAndGuarantee,
+      dueDay: dueDay,
+      hasInsurance: hasInsurance,
+    );
+    await fetchUnits();
+  }
+
+  Future<void> endContractAndVacate(String unitId) async {
+    await _repository.vacateUnit(unitId);
     await fetchUnits();
   }
 }

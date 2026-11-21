@@ -92,10 +92,22 @@ class PropertyRepositoryImpl implements PropertyRepository {
     ),
   ];
 
+  String _today() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  Map<String, dynamic>? _readContract(String unitId) {
+    final raw = _box.read('contract_$unitId');
+    if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+    return null;
+  }
+
   List<PaymentRecord> _readPayments(String unitId) {
-    final raw = _box.read<List<dynamic>>('payments_$unitId');
+    final raw = _box.read('payments_$unitId');
     if (raw == null) {
-      // دفعات ابتدائية افتراضية لتوضيح الدفع الكامل والجزئي
       if (unitId == 'unit_101') {
         return const [
           PaymentRecord(
@@ -119,13 +131,70 @@ class PropertyRepositoryImpl implements PropertyRepository {
       }
       return [];
     }
-    return raw.map((e) => PaymentRecord.fromMap(Map<String, dynamic>.from(e))).toList();
+    if (raw is List) {
+      return raw.map((e) => PaymentRecord.fromMap(Map<String, dynamic>.from(e))).toList();
+    }
+    return [];
+  }
+
+  Future<void> _logMovement(MovementRecord record) async {
+    final current = await getMovements();
+    final updated = [record, ...current];
+    await _box.write('movements_log', updated.map((e) => e.toMap()).toList());
+  }
+
+  @override
+  Future<List<MovementRecord>> getMovements() async {
+    final raw = _box.read('movements_log');
+    if (raw == null) {
+      return const [
+        MovementRecord(
+          id: 'mov_1',
+          titleAr: 'استلام دفعة إيجار (\$350)',
+          titleEn: 'Rent Payment Received (\$350)',
+          subtitleAr: 'شقة 101 • أحمد صالح المقطري (محفظة إلكترونية)',
+          subtitleEn: 'Apt 101 • Ahmed Al-Maqtari (E-Wallet)',
+          date: '2026-11-10',
+          type: 'payment',
+        ),
+        MovementRecord(
+          id: 'mov_2',
+          titleAr: 'استلام دفعة جزئية (\$150)',
+          titleEn: 'Partial Payment Received (\$150)',
+          subtitleAr: 'شقة 102 • خالد محمد الحميري (نقداً)',
+          subtitleEn: 'Apt 102 • Khaled Al-Hemyari (Cash)',
+          date: '2026-11-14',
+          type: 'payment',
+        ),
+      ];
+    }
+    if (raw is List) {
+      return raw.map((e) => MovementRecord.fromMap(Map<String, dynamic>.from(e))).toList();
+    }
+    return [];
   }
 
   @override
   Future<List<PropertyEntity>> getUnitsAndContracts() async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    return _baseUnits.map((unit) => unit.copyWith(payments: _readPayments(unit.id))).toList();
+    await Future.delayed(const Duration(milliseconds: 350));
+    return _baseUnits.map((unit) {
+      final contractOverride = _readContract(unit.id);
+      if (contractOverride != null) {
+        final bool rented = contractOverride['isRented'] ?? false;
+        return unit.copyWith(
+          isRented: rented,
+          tenantName: rented ? (contractOverride['tenantName'] ?? '-') : '-',
+          tenantPhone: rented ? (contractOverride['tenantPhone'] ?? '-') : '-',
+          familyMembers: rented ? (contractOverride['familyMembers'] ?? 1) : 0,
+          jobAndGuaranteeAr: rented ? (contractOverride['jobAndGuarantee'] ?? '-') : '-',
+          jobAndGuaranteeEn: rented ? (contractOverride['jobAndGuarantee'] ?? '-') : '-',
+          dueDay: contractOverride['dueDay'] ?? unit.dueDay,
+          hasInsurance: contractOverride['hasInsurance'] ?? false,
+          payments: rented ? _readPayments(unit.id) : [],
+        );
+      }
+      return unit.copyWith(payments: _readPayments(unit.id));
+    }).toList();
   }
 
   @override
@@ -136,20 +205,89 @@ class PropertyRepositoryImpl implements PropertyRepository {
     required String referenceNumber,
   }) async {
     final current = _readPayments(unitId);
-    final now = DateTime.now();
-    final dateStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final unit = _baseUnits.firstWhere((u) => u.id == unitId);
+    final contractOverride = _readContract(unitId);
+    final tenant = contractOverride?['tenantName'] ?? unit.tenantName;
 
     current.insert(
       0,
       PaymentRecord(
-        id: 'pay_${now.millisecondsSinceEpoch}',
+        id: 'pay_${DateTime.now().millisecondsSinceEpoch}',
         amount: amount,
         method: method,
         referenceNumber: referenceNumber.trim().isEmpty ? 'CASH-${current.length + 1}' : referenceNumber.trim(),
-        date: dateStr,
+        date: _today(),
       ),
     );
 
     await _box.write('payments_$unitId', current.map((e) => e.toMap()).toList());
+    await _logMovement(
+      MovementRecord(
+        id: 'mov_${DateTime.now().millisecondsSinceEpoch}',
+        titleAr: 'استلام دفعة إيجار (\$${amount.toInt()})',
+        titleEn: 'Rent Payment Received (\$${amount.toInt()})',
+        subtitleAr: '${unit.unitTitleAr} • $tenant (${method == 'wallet' ? 'محفظة' : 'نقداً'})',
+        subtitleEn: '${unit.unitTitleEn} • $tenant (${method == 'wallet' ? 'Wallet' : 'Cash'})',
+        date: _today(),
+        type: 'payment',
+      ),
+    );
+  }
+
+  @override
+  Future<void> assignTenantToUnit({
+    required String unitId,
+    required String tenantName,
+    required String tenantPhone,
+    required int familyMembers,
+    required String jobAndGuarantee,
+    required int dueDay,
+    required bool hasInsurance,
+  }) async {
+    final unit = _baseUnits.firstWhere((u) => u.id == unitId);
+    await _box.write('contract_$unitId', {
+      'isRented': true,
+      'tenantName': tenantName,
+      'tenantPhone': tenantPhone,
+      'familyMembers': familyMembers,
+      'jobAndGuarantee': jobAndGuarantee,
+      'dueDay': dueDay,
+      'hasInsurance': hasInsurance,
+    });
+    await _box.write('payments_$unitId', []);
+
+    await _logMovement(
+      MovementRecord(
+        id: 'mov_${DateTime.now().millisecondsSinceEpoch}',
+        titleAr: 'توقيع عقد وتأجير وحدة',
+        titleEn: 'New Lease Contract Signed',
+        subtitleAr: '${unit.unitTitleAr} • المستأجر: $tenantName',
+        subtitleEn: '${unit.unitTitleEn} • Tenant: $tenantName',
+        date: _today(),
+        type: 'contract',
+      ),
+    );
+  }
+
+  @override
+  Future<void> vacateUnit(String unitId) async {
+    final unit = _baseUnits.firstWhere((u) => u.id == unitId);
+    final contractOverride = _readContract(unitId);
+    final oldTenant = contractOverride?['tenantName'] ?? unit.tenantName;
+
+    await _box.write('contract_$unitId', {'isRented': false});
+    await _box.write('payments_$unitId', []);
+
+    await _logMovement(
+      MovementRecord(
+        id: 'mov_${DateTime.now().millisecondsSinceEpoch}',
+        titleAr: 'إنهاء عقد وإخلاء وحدة',
+        titleEn: 'Contract Ended & Unit Vacated',
+        subtitleAr: '${unit.unitTitleAr} • المستأجر السابق: $oldTenant',
+        subtitleEn: '${unit.unitTitleEn} • Former Tenant: $oldTenant',
+        date: _today(),
+        type: 'vacate',
+      ),
+    );
   }
 }
